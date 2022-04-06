@@ -3,20 +3,6 @@ from scipy import stats
 from time import time
 from tensorly.decomposition import parafac
 
-#%% GENERAL FUNCTIONS
-
-def fixed_point(f, x0, delta=1e-6, time_lim=5):
-    ''' Fixed point algorithm '''
-    xp, xm = f(x0), x0
-    t0 = time()
-    while np.max(np.abs(xp-xm)) > delta:
-        print(xp)
-        xp, xm = f(xp), xp
-        if time()-t0 > time_lim:
-            xp = np.nan
-            break
-    return xp
-
 #%% TENSOR OPERATIONS
 
 def outer_vec(vec_list):
@@ -70,13 +56,25 @@ def CPD1(X):
     sigma, svecs = parafac(X, rank=1, normalize_factors=True)
     return sigma[0], [v[:, 0] for v in svecs]
 
-#%% STIELTJES TRANSFORM
+#%% LSD AND ALIGNMENTS
 
-def stieltjes(z, c, delta=1e-6):
-    gg = 1j*np.ones_like(c)
-    gp, gm = np.sum(gg), 1j
-    while np.abs(gp-gm) > delta:
-        print(gp)
-        gg = (gp+z-np.sqrt(4*c+(gp+z)**2))/2
-        gp, gm = np.sum(gg), gp
-    return gp, gg
+def stieltjes(zz, c, delta=1e-6):
+    ''' Stieltjes transfrom of the LSD '''
+    gi = 1j*np.ones((c.size, zz.size))
+    gp, gm = np.sum(gi, axis=0), 1j*np.ones_like(zz)
+    while np.max(np.abs(gp-gm)) > delta:
+        gi = -c[:, None]/(gp-gi+zz)
+        gp, gm = np.sum(gi, axis=0), gp
+    return gp, gi
+
+def alignments(sigma, c):
+    ''' Asymptotic singular value and alignments '''
+    g, gi = stieltjes(np.array([sigma]), c)
+    g, gi = g[0].real, gi[:, 0].real
+    print(g, gi)
+    d = c.size
+    b = 1/(sigma+g-gi)
+    k = (b**(d-2)/np.prod(b))**(1/(2*d-4))
+    beta = (np.prod(k)/(sigma+g))**((d-2)/2)
+    a = (b**(d-2)/(beta*beta*np.prod(b)))**(1/(2*d-4))
+    return beta, a
