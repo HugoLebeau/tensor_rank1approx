@@ -1,4 +1,3 @@
-import sparse
 import numpy as np
 from scipy import stats
 from time import time
@@ -47,29 +46,6 @@ def make_T(n, x, beta):
 def make_B(n, eps):
     ''' Construction of a Bernoulli mask '''
     return stats.bernoulli.rvs(eps, size=n)
-
-def make_sparse_TB(n, x, beta, eps):
-    ''' Construction of sparse T*B '''
-    d = len(n)
-    
-    # Tensor coordinates [i_1, ..., i_d] are assigned a unique index between 0 and n_1 * ... * n_d - 1
-    # idx = i_1 + ( i_2 + ( ... + ( i_d * n_{d - 1} ) ... ) * n_2 ) * n_1
-    def idx_to_coord(idx):
-        coord = np.zeros(d, dtype=int)
-        q = idx
-        for i in range(d):
-            coord[i] = q%n[i]
-            q //= n[i]
-        return coord
-    
-    nnz = stats.binom.rvs(np.prod(n), eps) # number of non-zero elements
-    idx_coords = np.random.choice(np.prod(n), size=nnz, replace=False) # choice of indices
-    coords = list(map(idx_to_coord, idx_coords)) # index -> tensor coordinate
-    # Generate data
-    data = stats.norm.rvs(size=nnz)/np.sqrt(np.sum(n)) # noise
-    for i, coord in enumerate(coords):
-        data[i] += beta*np.prod([x[k][coord[k]] for k in range(d)]) # signal
-    return sparse.COO(np.array(coords).T, data, shape=tuple(n))
 
 #%% TENSOR TRANSFORMATIONS
 
