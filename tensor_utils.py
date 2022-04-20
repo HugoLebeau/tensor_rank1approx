@@ -1,7 +1,13 @@
+import warnings
 import numpy as np
 from scipy import stats
-from time import time
 from tensorly.decomposition import parafac
+
+#%% GENERIC FUNCTIONS
+
+def plot_interv(xmin, xmax, alpha=.05):
+    delta = alpha*(xmax-xmin)/2
+    return xmin-delta, xmax+delta
 
 #%% TENSOR OPERATIONS
 
@@ -58,23 +64,24 @@ def CPD1(X):
 
 #%% LSD AND ALIGNMENTS
 
-def stieltjes(zz, c, delta=1e-6):
+def stieltjes(zz, c, eps, delta=1e-6):
     ''' Stieltjes transfrom of the LSD '''
     gi = 1j*np.ones((c.size, zz.size))
     gp, gm = np.sum(gi, axis=0), 1j*np.ones_like(zz)
     while np.max(np.abs(gp-gm)) > delta:
-        gi = -c[:, None]/(gp-gi+zz)
+        gi = -c[:, None]/(eps*(gp-gi)+zz)
         gp, gm = np.sum(gi, axis=0), gp
     return gp, gi
 
-def alignments(sigma, c):
+def alignments(sigma, c, eps):
     ''' Asymptotic singular value and alignments '''
-    g, gi = stieltjes(np.array([sigma]), c)
+    g, gi = stieltjes(np.array([sigma]), c, eps)
     g, gi = g[0].real, gi[:, 0].real
-    print(g, gi)
     d = c.size
-    b = 1/(sigma+g-gi)
+    b = 1/(sigma/eps+g-gi)
     k = (b**(d-2)/np.prod(b))**(1/(2*d-4))
-    beta = (np.prod(k)/(sigma+g))**((d-2)/2)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore") # avoid RuntimeWarning
+        beta = (np.prod(k)/(sigma/eps+g))**((d-2)/2)
     a = (b**(d-2)/(beta*beta*np.prod(b)))**(1/(2*d-4))
     return beta, a
