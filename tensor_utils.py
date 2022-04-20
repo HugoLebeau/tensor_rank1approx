@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 from scipy import stats
 from tensorly.decomposition import parafac
@@ -73,15 +72,15 @@ def stieltjes(zz, c, eps, delta=1e-6):
         gp, gm = np.sum(gi, axis=0), gp
     return gp, gi
 
-def alignments(sigma, c, eps):
+def alignments(sigma, c, eps, tol=1e-5):
     ''' Asymptotic singular value and alignments '''
     g, gi = stieltjes(np.array([sigma]), c, eps)
+    if np.abs(g[0].imag) > tol:
+        return np.nan, np.zeros_like(c)
     g, gi = g[0].real, gi[:, 0].real
     d = c.size
     b = 1/(sigma/eps+g-gi)
     k = (b**(d-2)/np.prod(b))**(1/(2*d-4))
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore") # avoid RuntimeWarning
-        beta = (np.prod(k)/(sigma/eps+g))**((d-2)/2)
+    beta = (np.prod(k)/(sigma/eps+g))**((d-2)/2)
     a = (b**(d-2)/(beta*beta*np.prod(b)))**(1/(2*d-4))
     return beta, a
