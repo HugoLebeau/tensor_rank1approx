@@ -1,10 +1,11 @@
 import numpy as np
-from scipy import stats
+from scipy import linalg, stats
 from tensorly.decomposition import parafac
 
 #%% GENERIC FUNCTIONS
 
 def plot_interv(xmin, xmax, alpha=.05):
+    ''' Extend a given interval by a factor alpha, for plotting purposes. '''
     delta = alpha*(xmax-xmin)/2
     return xmin-delta, xmax+delta
 
@@ -60,6 +61,28 @@ def CPD1(X):
     ''' Best rank-1 approximation of X '''
     sigma, svecs = parafac(X, rank=1, normalize_factors=True)
     return sigma[0], [v[:, 0] for v in svecs]
+
+def tensor_power_method(X, u=None, tol=1e-5):
+    '''
+    Best rank-1 approximation / dominant singular value and vectors of X.
+    This function is not optimized, the use of CPD1 is preferred.
+    '''
+    n = X.shape
+    d = len(n)
+    if u is None:
+        u = [stats.norm.rvs(size=ni) for ni in n]
+        u = [u[i]/linalg.norm(u[i]) for i in range(d)]
+    range_d = list(range(d))
+    stop = False
+    while not stop:
+        stop = True
+        for i in range(d):
+            ui_temp = tensor_contraction(X, u[:i]+u[i+1:], range_d[:i]+range_d[i+1:])
+            ui_temp /= linalg.norm(ui_temp)
+            stop &= (linalg.norm(u[i]-ui_temp) < tol)
+            u[i] = ui_temp
+    sigma = tensor_contraction(X, u, range_d)
+    return sigma, u
 
 #%% LSD AND ALIGNMENTS
 
