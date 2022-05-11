@@ -62,28 +62,6 @@ def CPD1(X):
     sigma, svecs = parafac(X, rank=1, normalize_factors=True)
     return sigma[0], [v[:, 0] for v in svecs]
 
-def tensor_power_method(X, u=None, tol=1e-5):
-    '''
-    Best rank-1 approximation / dominant singular value and vectors of X.
-    This function is not optimized, the use of CPD1 is preferred.
-    '''
-    n = X.shape
-    d = len(n)
-    if u is None:
-        u = [stats.norm.rvs(size=ni) for ni in n]
-        u = [u[i]/linalg.norm(u[i]) for i in range(d)]
-    range_d = list(range(d))
-    stop = False
-    while not stop:
-        stop = True
-        for i in range(d):
-            ui_temp = tensor_contraction(X, u[:i]+u[i+1:], range_d[:i]+range_d[i+1:])
-            ui_temp /= linalg.norm(ui_temp)
-            stop &= (linalg.norm(u[i]-ui_temp) < tol)
-            u[i] = ui_temp
-    sigma = tensor_contraction(X, u, range_d)
-    return sigma, u
-
 #%% LSD AND ALIGNMENTS
 
 def stieltjes(zz, c, eps, delta=1e-6):
@@ -102,8 +80,7 @@ def alignments(sigma, c, eps, tol=1e-5):
         return np.nan, np.zeros_like(c)
     g, gi = g[0].real, gi[:, 0].real
     d = c.size
-    b = 1/(sigma/eps+g-gi)
-    k = (b**(d-2)/np.prod(b))**(1/(2*d-4))
-    beta = (np.prod(k)/(sigma/eps+g))**((d-2)/2)
-    a = (b**(d-2)/(beta*beta*np.prod(b)))**(1/(2*d-4))
+    r = sigma/eps+g-gi
+    beta = np.sqrt(np.prod(r)/(sigma/eps+g)**(d-2))
+    a = (np.prod(r)/(beta*beta*r**(d-2)))**(1/(2*d-4))
     return beta, a
