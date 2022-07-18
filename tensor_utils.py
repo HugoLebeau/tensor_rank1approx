@@ -1,13 +1,23 @@
 import numpy as np
-from scipy import linalg, stats
+from scipy import stats
+from itertools import permutations
 from tensorly.decomposition import parafac
 
 #%% GENERIC FUNCTIONS
 
 def plot_interv(xmin, xmax, alpha=.05):
-    ''' Extend a given interval by a factor alpha, for plotting purposes. '''
+    ''' Extend a given interval by a factor alpha, for plotting purposes '''
     delta = alpha*(xmax-xmin)/2
     return xmin-delta, xmax+delta
+
+def get_classif_error(k, partition, true_partition):
+    ''' Compute classification error '''
+    permut = np.array(list(permutations(range(k))))
+    c_err_list = [np.mean(pp[partition] != true_partition) for pp in permut]
+    per = permut[np.argmin(c_err_list)]
+    per_inv = np.argsort(per)
+    c_err = np.min(c_err_list)
+    return c_err, per, per_inv
 
 #%% TENSOR OPERATIONS
 
@@ -81,9 +91,6 @@ def alignments(sigma, c, eps, tol=1e-5):
     if np.abs(gg['g'][0].imag) > tol:
         return np.nan, np.zeros_like(c)
     g, gi = gg['g'][0].real, gg['gi'][:, 0].real
-    d = c.size
-    r = sigma/eps+g
-    ri = r-gi
-    beta = np.sqrt(np.prod(ri)/r**(d-2))
-    a = np.sqrt(r/ri)
-    return beta, a
+    q = np.sqrt(1-eps*gi*gi/c)
+    beta = (sigma/eps+g)/np.prod(q)
+    return beta, q
