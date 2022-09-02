@@ -42,8 +42,8 @@ def tensor_contraction(X, a_list, axes):
 def make_T(n, x, beta):
     ''' Construction of a tensor T = rank-1 signal + noise '''
     P = beta*outer_vec(x)
-    W = stats.norm.rvs(size=n)/np.sqrt(np.sum(n))
-    return P+W
+    Z = stats.norm.rvs(size=n)/np.sqrt(np.sum(n))
+    return P+Z
 
 def make_B(n, eps):
     ''' Construction of a Bernoulli mask '''
@@ -74,8 +74,17 @@ def CPD1(X):
 
 #%% LSD AND ALIGNMENTS
 
+def stieltjes_scalar(z, c, eps, delta=1e-6):
+    ''' Stieltjes transform of the LSD '''
+    gi = 1j*np.ones(c.size)
+    gp, gm = np.sum(gi), 1j
+    while np.abs(gp-gm) > delta:
+        gi = -c/(eps*(gp-gi)+z)
+        gp, gm = np.sum(gi), gp
+    return gp, gi
+
 def stieltjes(zz, c, eps, delta=1e-6, maxiter=1000):
-    ''' Stieltjes transfrom of the LSD '''
+    ''' Stieltjes transform of the LSD '''
     gi = 1j*np.ones((c.size, zz.size))
     gp, gm = np.sum(gi, axis=0), 1j*np.ones_like(zz)
     n_iter = 0
@@ -87,10 +96,29 @@ def stieltjes(zz, c, eps, delta=1e-6, maxiter=1000):
 
 def alignments(sigma, c, eps, tol=1e-5):
     ''' Asymptotic singular value and alignments '''
-    gg = stieltjes(np.array([sigma]), c, eps)
-    if np.abs(gg['g'][0].imag) > tol:
+    g, gi = stieltjes_scalar(sigma, c, eps)
+    if np.abs(g.imag) > tol:
         return np.nan, np.zeros_like(c)
-    g, gi = gg['g'][0].real, gg['gi'][:, 0].real
-    q = np.sqrt(1-eps*gi*gi/c)
-    beta = (sigma/eps+g)/np.prod(q)
+    q = np.sqrt(1-eps*(gi.real**2)/c)
+    beta = (sigma/eps+g.real)/np.prod(q)
     return beta, q
+
+def phase_transition(c, eps, x0=1, eta=1e-5, delta=1e-5, tol0=1e-3):
+    ''' Finds the right edge of the bulk to compute beta and the alignments at phase transition '''
+    # Initialisation
+    z = x0+1j*eta
+    g, gi = stieltjes_scalar(z, c, eps, delta)
+    while g.imag > delta: # while z is not on the right side of the bulk
+        z += x0 # push z to the right
+        g, gi = stieltjes_scalar(z, c, eps, delta)
+    step = -z.real/10 # initialise step towards left
+    # Compute position of the right edge
+    while np.abs(step) > delta:
+        z += step # make a step
+        (g, gi), g_old = stieltjes_scalar(z, c, eps, delta), g
+        if (g.imag > tol0 and g_old.imag < tol0) or (g.imag < tol0 and g_old.imag > tol0): # if the edge is crossed
+            step = -step/2 # change direction and reduce step size
+    # Return the corresponding beta and alignments
+    align = np.sqrt(1-eps*(gi.real**2)/c)
+    beta = (z.real/eps+g.real)/np.prod(align)
+    return beta, align
