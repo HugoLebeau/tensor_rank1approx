@@ -103,9 +103,10 @@ def alignments(sigma, c, eps, tol=1e-5):
     beta = (sigma/eps+g.real)/np.prod(q)
     return beta, q
 
-def phase_transition(c, eps, x0=1, eta=1e-5, delta=1e-5, tol0=1e-3):
+def phase_transition(c, eps, eta=1e-5, delta=1e-5, tol0=1e-3):
     ''' Finds the right edge of the bulk to compute beta and the alignments at phase transition '''
     # Initialisation
+    x0 = np.sum(np.sqrt(eps*c))
     z = x0+1j*eta
     g, gi = stieltjes_scalar(z, c, eps, delta)
     while g.imag > delta: # while z is not on the right side of the bulk
