@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import stats
-from itertools import permutations
+from itertools import permutations, product
 from tensorly.decomposition import parafac
 
 #%% GENERIC FUNCTIONS
@@ -30,12 +30,30 @@ def outer_vec(vec_list):
     return np.einsum(*l)
 
 def tensor_contraction(X, a_list, axes):
-    ''' Contraction of a tensor X against vectors a on given axes. '''
+    ''' Contraction of a tensor X against vectors a on given axes '''
     l = [X, np.arange(len(X.shape))]
     for a, axis in zip(a_list, axes):
         l.append(a)
         l.append([axis])
     return np.einsum(*l)
+
+def tucker_prod(G, U_list):
+    ''' Tucker decomposition to tensor [G; U[0], ..., U[d-1]] '''
+    d = len(U_list)
+    l = [G, np.arange(d)]
+    for i, U in enumerate(U_list):
+        l.append(U)
+        l.append([d+i, i])
+    return np.einsum(*l)
+
+def tensor_prod(A, B, modes):
+    ''' Tensor product along given modes '''
+    if type(modes) != np.ndarray:
+        modes = np.array(modes)
+    dA, dB = len(A.shape), len(B.shape)
+    idxA, idxB = np.arange(dA), np.arange(dA, dA+dB)
+    idxB[modes] = idxA[modes]
+    return np.einsum(A, idxA, B, idxB)
 
 #%% TENSOR CONSTRUCTION
 
@@ -47,7 +65,7 @@ def make_T(n, x, beta):
 
 def make_B(n, eps):
     ''' Construction of a Bernoulli mask '''
-    return stats.bernoulli.rvs(eps, size=n)
+    return stats.bernoulli.rvs(eps, size=n).astype(bool)
 
 #%% TENSOR TRANSFORMATIONS
 
@@ -67,9 +85,9 @@ def Phi(X, a_list):
             PhiM[idx[j]:idx[j+1], idx[i]:idx[i+1]] = Xij.T
     return PhiM
 
-def CPD1(X):
+def CPD1(X, mask=None):
     ''' Best rank-1 approximation of X '''
-    sigma, svecs = parafac(X, rank=1, normalize_factors=True)
+    sigma, svecs = parafac(X, rank=1, normalize_factors=True, mask=mask)
     return sigma[0], [v[:, 0] for v in svecs]
 
 #%% LSD AND ALIGNMENTS
