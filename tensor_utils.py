@@ -5,6 +5,8 @@ from tensorly.decomposition import parafac
 
 #%% GENERIC FUNCTIONS
 
+frob = lambda A: np.sqrt(np.sum(A**2))
+
 def plot_interv(xmin, xmax, alpha=.05):
     ''' Extend a given interval by a factor alpha, for plotting purposes '''
     delta = alpha*(xmax-xmin)/2
