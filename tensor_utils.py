@@ -2,7 +2,7 @@ import numpy as np
 from functools import reduce
 from itertools import permutations
 from scipy import linalg, stats
-from tensorly.base import unfold
+from tensorly.base import unfold, fold
 from tensorly.decomposition import parafac
 
 #%% GENERIC FUNCTIONS
@@ -65,18 +65,19 @@ def tuckerALS(T, r, delta=1e-6):
     d = len(n)
     T_unfold = [unfold(T, i) for i in range(d)]
     # Initialization
-    U = [linalg.svd(T_unfold[i])[0][:, :r[i]] for i in range(d)]
-    G = tucker_prod(T, [Ui.T for Ui in U])
+    U = [linalg.eigh(T_unfold[i]@T_unfold[i].T)[1][:, -r[i]:] for i in range(d)]
+    G = U[0].T@T_unfold[0]@reduce(np.kron, U[1:])
     norm_p, norm_m = np.sum(G**2), np.nan
     # Loop
     stop = False
     while not stop:
-        U = [linalg.svd(T_unfold[i]@reduce(np.kron, U[:i]+U[i+1:]))[0][:, :r[i]] for i in range(d)]
-        G = tucker_prod(T, [Ui.T for Ui in U])
+        kron_products = [reduce(np.kron, U[:i]+U[i+1:]) for i in range(d)]
+        U = [linalg.svd(T_unfold[i]@kron_products[i])[0][:, :r[i]] for i in range(d)]
+        G = U[0].T@T_unfold[0]@kron_products[0]
         norm_p, norm_m = np.sum(G**2), norm_p
         stop = (np.abs(norm_p-norm_m) < delta)
     # Output
-    return G, U
+    return fold(G, 0, r), U
 
 #%% TENSOR CONSTRUCTION
 
