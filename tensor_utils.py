@@ -1,6 +1,8 @@
 import numpy as np
-from scipy import stats
-from itertools import permutations, product
+from functools import reduce
+from itertools import permutations
+from scipy import linalg, stats
+from tensorly.base import unfold
 from tensorly.decomposition import parafac
 
 #%% GENERIC FUNCTIONS
@@ -56,6 +58,25 @@ def tensor_prod(A, B, modes):
     idxA, idxB = np.arange(dA), np.arange(dA, dA+dB)
     idxB[modes] = idxA[modes]
     return np.einsum(A, idxA, B, idxB)
+
+def tuckerALS(T, r, delta=1e-6):
+    ''' Best multirank-r approximation with ALS '''
+    n = T.shape
+    d = len(n)
+    T_unfold = [unfold(T, i) for i in range(d)]
+    # Initialization
+    U = [linalg.svd(T_unfold[i])[0][:, :r[i]] for i in range(d)]
+    G = tucker_prod(T, [Ui.T for Ui in U])
+    norm_p, norm_m = np.sum(G**2), np.nan
+    # Loop
+    stop = False
+    while not stop:
+        U = [linalg.svd(T_unfold[i]@reduce(np.kron, U[:i]+U[i+1:]))[0][:, :r[i]] for i in range(d)]
+        G = tucker_prod(T, [Ui.T for Ui in U])
+        norm_p, norm_m = np.sum(G**2), norm_p
+        stop = (np.abs(norm_p-norm_m) < delta)
+    # Output
+    return G, U
 
 #%% TENSOR CONSTRUCTION
 
