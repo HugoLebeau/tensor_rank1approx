@@ -1,9 +1,9 @@
 import numpy as np
 from functools import reduce
-from itertools import permutations
 from scipy import linalg, stats
 from tensorly.base import unfold, fold
 from tensorly.decomposition import parafac
+from tensorly.tenalg import outer
 
 #%% GENERIC FUNCTIONS
 
@@ -14,76 +14,11 @@ def plot_interv(xmin, xmax, alpha=.05):
     delta = alpha*(xmax-xmin)/2
     return xmin-delta, xmax+delta
 
-def get_classif_error(k, partition, true_partition):
-    ''' Compute classification error '''
-    permut = np.array(list(permutations(range(k))))
-    c_err_list = [np.mean(pp[partition] != true_partition) for pp in permut]
-    per = permut[np.argmin(c_err_list)]
-    per_inv = np.argsort(per)
-    c_err = np.min(c_err_list)
-    return c_err, per, per_inv
-
-#%% TENSOR OPERATIONS
-
-def outer_vec(vec_list):
-    ''' Outer product of d vectors '''
-    l = []
-    for i, v in enumerate(vec_list):
-        l.append(v)
-        l.append([i])
-    return np.einsum(*l)
-
-def tensor_contraction(X, a_list, axes):
-    ''' Contraction of a tensor X against vectors a on given axes '''
-    l = [X, np.arange(len(X.shape))]
-    for a, axis in zip(a_list, axes):
-        l.append(a)
-        l.append([axis])
-    return np.einsum(*l)
-
-def tucker_prod(G, U_list):
-    ''' Tucker decomposition to tensor [G; U[0], ..., U[d-1]] '''
-    d = len(U_list)
-    l = [G, np.arange(d)]
-    for i, U in enumerate(U_list):
-        l.append(U)
-        l.append([d+i, i])
-    return np.einsum(*l)
-
-def tensor_prod(A, B, modes):
-    ''' Tensor product along given modes '''
-    if type(modes) != np.ndarray:
-        modes = np.array(modes)
-    dA, dB = len(A.shape), len(B.shape)
-    idxA, idxB = np.arange(dA), np.arange(dA, dA+dB)
-    idxB[modes] = idxA[modes]
-    return np.einsum(A, idxA, B, idxB)
-
-def tuckerALS(T, r, delta=1e-6):
-    ''' Best multirank-r approximation with ALS '''
-    n = T.shape
-    d = len(n)
-    T_unfold = [unfold(T, i) for i in range(d)]
-    # Initialization
-    U = [linalg.eigh(T_unfold[i]@T_unfold[i].T)[1][:, -r[i]:] for i in range(d)]
-    G = U[0].T@T_unfold[0]@reduce(np.kron, U[1:])
-    norm_p, norm_m = np.sum(G**2), np.nan
-    # Loop
-    stop = False
-    while not stop:
-        kron_products = [reduce(np.kron, U[:i]+U[i+1:]) for i in range(d)]
-        U = [linalg.svd(T_unfold[i]@kron_products[i])[0][:, :r[i]] for i in range(d)]
-        G = U[0].T@T_unfold[0]@kron_products[0]
-        norm_p, norm_m = np.sum(G**2), norm_p
-        stop = (np.abs(norm_p-norm_m) < delta)
-    # Output
-    return fold(G, 0, r), U
-
 #%% TENSOR CONSTRUCTION
 
 def make_T(n, x, beta):
     ''' Construction of a tensor T = rank-1 signal + noise '''
-    P = beta*outer_vec(x)
+    P = beta*outer(x)
     Z = stats.norm.rvs(size=n)/np.sqrt(np.sum(n))
     return P+Z
 
@@ -92,6 +27,14 @@ def make_B(n, eps):
     return stats.bernoulli.rvs(eps, size=n).astype(bool)
 
 #%% TENSOR TRANSFORMATIONS
+
+def tensor_contraction(X, a_list, axes):
+    ''' Contraction of a tensor X against vectors a on given axes '''
+    l = [X, np.arange(len(X.shape))]
+    for a, axis in zip(a_list, axes):
+        l.append(a)
+        l.append([axis])
+    return np.einsum(*l)
 
 def Phi(X, a_list):
     ''' Phi mapping '''
