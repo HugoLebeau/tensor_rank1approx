@@ -1,7 +1,5 @@
 import numpy as np
-from functools import reduce
-from scipy import linalg, stats
-from tensorly.base import unfold, fold
+from scipy import stats
 from tensorly.decomposition import parafac
 from tensorly.tenalg import outer
 
